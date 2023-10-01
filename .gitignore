@@ -1,0 +1,5 @@
+# Ignore all CSV files
+*.csv
+
+# Ignore the .DS_store file
+.DS_store
