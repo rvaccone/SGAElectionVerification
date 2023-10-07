@@ -12,6 +12,7 @@ You can adjust the variables in the config.ini file to match the election. The s
 
 Author: Rocco Vaccone
 Date: 10/1/2023
+Updated: 10/7/2023
 """
 
 # Module imports
@@ -43,17 +44,44 @@ def load_config():
     return config_dict
 
 
-# Identify the voting csv file name
-def find_voting_file():
-    files = [file for file in os.listdir() if os.path.isfile(file)]
-    for file in files:
-        if file.endswith(".csv") and file != "data.csv":
-            return file
-    raise FileNotFoundError("Voting file not found")
+# Identify one csv file in the directory
+def find_csv_file(excluded_files=["data"]):
+    """
+    Identifies one csv file in the directory and returns the name of the file.
+
+    Args:
+    excluded_files (list): A list of file names that should be excluded from the search.
+
+    Returns:
+    file (str): The name of the csv file.
+    """
+    files = [
+        file
+        for file in os.listdir()
+        if os.path.isfile(file)
+        and file.endswith(".csv")
+        and file.replace(".csv", "") not in excluded_files
+    ]
+    if not files:
+        raise FileNotFoundError("CSV file not found")
+    if len(files) != 1:
+        raise FileExistsError("Multiple CSV files found")
+    return files[0]
 
 
 # Load the data from the csv files
 def load_data(data_file, voting_file):
+    """
+    Loads the data from the csv files and returns them as DataFrames.
+
+    Args:
+    data_file (str): The name of the csv file with the student data.
+    voting_file (str): The name of the csv file with the voting responses.
+
+    Returns:
+    data_df (DataFrame): A DataFrame with the student data.
+    votes_df (DataFrame): A DataFrame with the voting responses.
+    """
     try:
         data_df = pd.read_csv(data_file)
         votes_df = pd.read_csv(voting_file)
@@ -65,6 +93,12 @@ def load_data(data_file, voting_file):
 
 # Create the logger
 def setup_logger():
+    """
+    Sets up the logger to log warnings and errors to a file.
+
+    Returns:
+    None
+    """
     today = date.today().strftime("%m-%d-%Y")
     logging.basicConfig(
         level=logging.INFO,
@@ -76,6 +110,14 @@ def setup_logger():
 
 # Initialize the votes, voting record, and voter CWIDs
 def initialize_setups():
+    """
+    Initializes the votes, voting record, and voter CWIDs.
+
+    Returns:
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+    voting_record (dict): A dictionary where each key-value pair is a type of vote and the number of votes of that type.
+    voter_cwids (set): A set of CWIDs of the voters.
+    """
     votes = {}
     voting_record = {
         "valid": 0,
@@ -89,6 +131,17 @@ def initialize_setups():
 
 # Add votes from a list to the votes dictionary
 def add_votes(candidate_list, votes, voting_record):
+    """
+    Adds votes from a list to the votes dictionary.
+
+    Args:
+    candidate_list (list): A list of candidates.
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+    voting_record (dict): A dictionary where each key-value pair is a type of vote and the number of votes of that type.
+
+    Returns:
+    None
+    """
     for candidate in candidate_list:
         voting_record["valid"] += 1
         if candidate not in votes.keys():
@@ -99,6 +152,16 @@ def add_votes(candidate_list, votes, voting_record):
 
 # Determine the school of a major
 def school_by_major(major, data_dict):
+    """
+    Determines the school of a major using a dictionary of schools and majors.
+
+    Args:
+    major (str): The major to find the school of.
+    data_dict (dict): A dictionary where each key-value pair is a school and a list of majors.
+
+    Returns:
+    school (str): The school of the major.
+    """
     if major is None:
         return None
     major = major.lower()
@@ -110,6 +173,16 @@ def school_by_major(major, data_dict):
 
 # Determine the school of a student by their CWID
 def school_by_cwid(cwid, data_df):
+    """
+    Determines the school of a student by their CWID.
+
+    Args:
+    cwid (str): The CWID of the student.
+    data_df (DataFrame): A DataFrame with the student data.
+
+    Returns:
+    school (str): The school of the student.
+    """
     subset = data_df.loc[data_df["CWID"] == cwid, "Major"]
     if not subset.empty:
         major = subset.iloc[0].lower()
@@ -120,6 +193,17 @@ def school_by_cwid(cwid, data_df):
 
 # Determine the school of the nominees a student voted for
 def get_nominees_school(row, candidate_column_name):
+    """
+    Determines the school of the nominees a student voted for.
+
+    Args:
+    row (Series): A row from the votes DataFrame.
+    candidate_column_name (str): The name of the column with the nominees.
+
+    Returns:
+    school (str): The school of the nominees.
+    candidates (list): A list of the candidates.
+    """
     schools = {
         candidate_column_name: "ses",
         candidate_column_name + ".1": "sob",
@@ -137,6 +221,21 @@ def get_nominees_school(row, candidate_column_name):
 def verify_vote(
     row, votes, voting_record, voter_cwids, data_df, school, candidate_column_name
 ):
+    """
+    Verifies a vote and adds it to the votes dictionary.
+
+    Args:
+    row (Series): A row from the votes DataFrame.
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+    voting_record (dict): A dictionary where each key-value pair is a type of vote and the number of votes of that type.
+    voter_cwids (set): A set of CWIDs of the voters.
+    data_df (DataFrame): A DataFrame with the student data.
+    school (str): The school of the election.
+    candidate_column_name (str): The name of the column with the nominees.
+
+    Returns:
+    None
+    """
     voter_school = school_by_cwid(row["Campus Wide ID (CWID)"], data_df)
     nominee_school, candidate_list = get_nominees_school(row, candidate_column_name)
 
@@ -161,6 +260,21 @@ def verify_vote(
 def iterate_votes(
     votes, voting_record, voter_cwids, data_df, votes_df, school, candidate_column_name
 ):
+    """
+    Iterates through the votes DataFrame and verifies each vote.
+
+    Args:
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+    voting_record (dict): A dictionary where each key-value pair is a type of vote and the number of votes of that type.
+    voter_cwids (set): A set of CWIDs of the voters.
+    data_df (DataFrame): A DataFrame with the student data.
+    votes_df (DataFrame): A DataFrame with the voting responses.
+    school (str): The school of the election.
+    candidate_column_name (str): The name of the column with the nominees.
+
+    Returns:
+    None
+    """
     for index, row in tqdm(votes_df.iterrows(), total=votes_df.shape[0]):
         verify_vote(
             row,
@@ -175,11 +289,29 @@ def iterate_votes(
 
 # Sort the votes dictionary by the number of votes
 def sort_votes(votes):
+    """
+    Sorts the votes dictionary by the number of votes.
+
+    Args:
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+
+    Returns:
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received sorted by the number of votes.
+    """
     return dict(sorted(votes.items(), key=lambda item: item[1], reverse=True))
 
 
 # Group the votes dictionary by the number of votes
 def group_votes_by_num(votes):
+    """
+    Groups the votes dictionary by the number of votes.
+
+    Args:
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+
+    Returns:
+    votes_by_num (dict): A dictionary where each key-value pair is the number of votes and a list of the candidates that received that number of votes.
+    """
     votes_by_num = defaultdict(list)
     for key, value in votes.items():
         votes_by_num[value].append(key)
@@ -188,6 +320,18 @@ def group_votes_by_num(votes):
 
 # Determine the elected candidates and if there are any tied candidates
 def determine_elected(votes_by_num, num_seats):
+    """
+    Determines the elected candidates and if there are any tied candidates.
+
+    Args:
+    votes_by_num (dict): A dictionary where each key-value pair is the number of votes and a list of the candidates that received that number of votes.
+    num_seats (int): The number of seats in the election.
+
+    Returns:
+    elected (list): A list of the elected candidates.
+    remaining (int): The number of remaining seats.
+    tied_elected (list): A list of the tied candidates.
+    """
     elected, remaining, tied_elected = [], None, None
     for key, value in sorted(votes_by_num.items(), reverse=True):
         if len(value) <= num_seats - len(elected):
@@ -203,6 +347,21 @@ def determine_elected(votes_by_num, num_seats):
 def print_output(
     num_seats, votes, voting_record, voter_cwids, elected, remaining, tied_elected
 ):
+    """
+    Displays the results of the election.
+
+    Args:
+    num_seats (int): The number of seats in the election.
+    votes (dict): A dictionary where each key-value pair is a candidate and the number of votes they received.
+    voting_record (dict): A dictionary where each key-value pair is a type of vote and the number of votes of that type.
+    voter_cwids (set): A set of CWIDs of the voters.
+    elected (list): A list of the elected candidates.
+    remaining (int): The number of remaining seats.
+    tied_elected (list): A list of the tied candidates.
+
+    Returns:
+    None
+    """
     print(f"\nThe voting record is:")
     for key, value in voting_record.items():
         print(f"    {key}: {value}")
@@ -224,9 +383,15 @@ def print_output(
 
 # Function to run the program
 def main():
+    """
+    Runs the program and determines the election results.
+
+    Returns:
+    None
+    """
     config = load_config()
 
-    voting_file = find_voting_file()
+    voting_file = find_csv_file()
     print(f"\nIdentified the voting csv file as '{voting_file}'")
     data_df, votes_df = load_data(config["data_file"], voting_file)
 
