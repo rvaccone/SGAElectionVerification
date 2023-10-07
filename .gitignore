@@ -3,3 +3,9 @@
 
 # Ignore the .DS_store file
 .DS_store
+
+# Ignore the log files
+*.log
+
+# Ignore the pycache directory
+__pycache__/
